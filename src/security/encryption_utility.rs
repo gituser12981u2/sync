@@ -3,12 +3,12 @@ use openssl::symm::{Cipher, Crypter, Mode};
 use rand::RngCore;
 use std::io::Error;
 
-pub struct PskSession {
+pub struct EncryptionUtility {
     key: Vec<u8>,
     cipher: Cipher,
 }
 
-impl PskSession {
+impl EncryptionUtility {
     pub fn new(key: Vec<u8>) -> Self {
         Self {
             key,

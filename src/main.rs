@@ -1,8 +1,10 @@
 // src/main.rs
 mod p2p;
 mod security;
+mod transport;
 mod ui;
 
+use p2p::peer::Peer;
 use structopt::StructOpt;
 use ui::io::Opt;
 
@@ -10,7 +12,8 @@ use ui::io::Opt;
 async fn main() -> tokio::io::Result<()> {
     let opt = Opt::from_args();
 
-    p2p::discovery::discover_peer(opt.ip, opt.port, &opt.file).await?;
+    let mut peer = Peer::new(None);
+    peer.connect(&opt.ip, opt.port, &opt.file).await?;
 
     Ok(())
 }

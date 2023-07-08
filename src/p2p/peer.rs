@@ -1,46 +1,29 @@
 // src/p2p/peer.rs
-use crate::security::psk::PskSession;
-use rand::RngCore;
+use crate::security::encrypt::Encryptor;
+use crate::transport::sender::Sender;
 use std::path::Path;
 use tokio::fs::File;
-use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::io::{self, AsyncReadExt};
 
 pub struct Peer {
-    ip: String,
-    port: u16,
-    psk: Vec<u8>,
+    encryptor: Encryptor,
 }
 
 impl Peer {
-    pub fn new(ip: String, port: u16) -> Self {
-        let mut psk = vec![0u8; 32]; // 256 bits
-        rand::thread_rng().fill_bytes(&mut psk);
+    pub fn new(key: Option<Vec<u8>>) -> Self {
+        let encryptor = Encryptor::new(key);
 
-        Self { ip, port, psk }
+        Self { encryptor }
     }
 
-    pub async fn connect(&mut self, filepath: &Path) -> io::Result<()> {
-        let addr = format!("{}:{}", self.ip, self.port);
+    pub async fn connect(&mut self, ip: &str, port: u16, filepath: &Path) -> io::Result<()> {
+        let mut sender = Sender::new(ip, port).await?;
 
-        // connect to the server
-        let mut stream = TcpStream::connect(addr).await?;
-
-        // print the PSK for this IP
-        println!("PSK for IP {}: {}", self.ip, hex::encode(&self.psk));
-
-        // create a PskSession for encryption and decryption
-        let psk_session = PskSession::new(self.psk.clone());
-
-        // send the filename
+        // Send the filename first
         let filename = filepath.file_name().unwrap().to_str().unwrap();
-
-        let filename_bytes = filename.as_bytes();
-
-        println!("file name after bytes: {}", filename);
-
-        stream.write_u16(filename_bytes.len() as u16).await?;
-        stream.write_all(filename_bytes).await?; // send 0 as a delimiter
+        let filename_len = filename.len() as u16;
+        sender.send(&filename_len.to_be_bytes()).await?;
+        sender.send(filename.as_bytes()).await?;
 
         // open the file
         let mut file = File::open(filepath).await?;
@@ -56,12 +39,11 @@ impl Peer {
             }
 
             // encrypt the chunk
-            let encrypted = psk_session.encrypt(&buffer[..n])?;
+            let encrypted = self.encryptor.encrypt(&buffer[..n])?;
 
-            // send the chunk
-            stream.write_all(&encrypted).await?;
+            sender.send_chunked(&encrypted, 1024).await?;
         }
-        println!("{} has been sent", filename);
+        println!("{} has been sent", filepath.display());
         Ok(())
     }
 }
