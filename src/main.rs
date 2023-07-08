@@ -1,4 +1,5 @@
 // src/main.rs
+mod data;
 mod p2p;
 mod security;
 mod transport;

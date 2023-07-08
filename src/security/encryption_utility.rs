@@ -1,4 +1,4 @@
-// src/security/psk.rs
+// src/security/encryption_utility.rs
 use openssl::symm::{Cipher, Crypter, Mode};
 use rand::RngCore;
 use std::io::Error;
